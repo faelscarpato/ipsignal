@@ -11,6 +11,7 @@ import { extractDirectiveHeaders } from "./directives";
 let cachedToken: string | null = null;
 let cachedExpiresAt = 0;
 const authorizedSet = new Set<string>();
+const signedUrls = new Map<string, string>();
 
 function extractOrigin(rawUrl: string): string | null {
   try {
@@ -64,10 +65,16 @@ export async function ensureRelayAuthorized(
       ok?: boolean;
       token?: string;
       expiresAt?: number;
+      sigs?: Record<string, string>;
     };
     if (data.ok && data.token) {
       cachedToken = data.token;
       cachedExpiresAt = data.expiresAt ?? Date.now() + 3600_000;
+      if (data.sigs) {
+        for (const [k, v] of Object.entries(data.sigs)) {
+          signedUrls.set(k, v);
+        }
+      }
       for (const u of validUrls) {
         const origin = extractOrigin(u);
         if (origin) authorizedSet.add(origin);
@@ -90,9 +97,11 @@ export async function resolveChannelRelayUrl(
   signal?: AbortSignal,
 ): Promise<string> {
   const token = await ensureRelayAuthorized([url], signal);
+  const sig = signedUrls.get(url);
   const headers = extractDirectiveHeaders(directives);
   const params = new URLSearchParams();
   params.set("url", url);
+  if (sig) params.set("sig", sig);
   if (token) params.set("token", token);
   if (headers.userAgent) params.set("ua", headers.userAgent);
   if (headers.referer) params.set("ref", headers.referer);
@@ -103,4 +112,5 @@ export function resetClientRelaySession(): void {
   cachedToken = null;
   cachedExpiresAt = 0;
   authorizedSet.clear();
+  signedUrls.clear();
 }

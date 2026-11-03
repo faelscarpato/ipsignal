@@ -28,10 +28,12 @@ const globalForRelay = globalThis as unknown as { __sinalRelayState?: RelayGloba
 
 function getRelayState(): RelayGlobalState {
   if (!globalForRelay.__sinalRelayState) {
-    const envSecret = process.env.RELAY_SECRET;
-    const secret = envSecret
-      ? crypto.createHash("sha256").update(envSecret).digest()
-      : crypto.randomBytes(32);
+    const seed =
+      process.env.RELAY_SECRET ||
+      process.env.VERCEL_PROJECT_ID ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      "sinal-iptv-studio-relay-hmac-key";
+    const secret = crypto.createHash("sha256").update(seed).digest();
     globalForRelay.__sinalRelayState = {
       secret,
       authorizedOrigins: new Map(),

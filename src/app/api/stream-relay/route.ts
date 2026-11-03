@@ -18,6 +18,7 @@ import {
   buildSignedRelayPath,
   extractDirectiveHeaders,
   RELAY_COOKIE_NAME,
+  signRelayTargetUrl,
   verifyRelayAccess,
   verifySameOriginRequest,
   type ForwardedStreamHeaders,
@@ -62,6 +63,16 @@ export async function POST(req: Request) {
 
   const auth = authorizeRelaySources(urls);
   let relayUrl: string | undefined;
+  const sigs: Record<string, string> = {};
+
+  for (const raw of urls.slice(0, 2000)) {
+    const check = validateHttpUrl(raw);
+    if (check.ok) {
+      const normalized = check.url.toString();
+      sigs[raw] = signRelayTargetUrl(normalized);
+      sigs[normalized] = sigs[raw];
+    }
+  }
 
   if (typeof body.url === "string" && body.url.trim()) {
     const check = validateHttpUrl(body.url.trim());
@@ -86,6 +97,7 @@ export async function POST(req: Request) {
     expiresAt: auth.expiresAt,
     authorizedCount: auth.authorizedCount,
     relayUrl,
+    sigs,
   });
 
   res.cookies.set(RELAY_COOKIE_NAME, auth.token, {
